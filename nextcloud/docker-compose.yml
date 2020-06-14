@@ -1,0 +1,99 @@
+version: '3' 
+
+services:
+
+  proxy:
+    image: jwilder/nginx-proxy:alpine
+    labels:
+      - "com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy=true"
+    container_name: nextcloud-proxy
+    networks:
+      - nextcloud_network
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./proxy/conf.d:/etc/nginx/conf.d:rw
+      - ./proxy/vhost.d:/etc/nginx/vhost.d:rw
+      - ./proxy/html:/usr/share/nginx/html:rw
+      - ./proxy/certs:/etc/nginx/certs:ro
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    restart: unless-stopped
+  
+  letsencrypt:
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    container_name: nextcloud-letsencrypt
+    depends_on:
+      - proxy
+    networks:
+      - nextcloud_network
+    volumes:
+      - ./proxy/certs:/etc/nginx/certs:rw
+      - ./proxy/vhost.d:/etc/nginx/vhost.d:rw
+      - ./proxy/html:/usr/share/nginx/html:rw
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+
+  db:
+    image: mariadb
+    container_name: nextcloud-mariadb
+    networks:
+      - nextcloud_network
+    volumes:
+      - ./database:/var/lib/mysql
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - MYSQL_ROOT_PASSWORD=XXX1 ## password root. Seems not to be used in any further configuration 
+      - MYSQL_USER=XXX2
+      - MYSQL_PASSWORD=XXX3
+      - MYSQL_DATABASE=XXX4
+    restart: unless-stopped
+
+  app:
+    image: nextcloud:latest
+    container_name: nextcloud-app
+    networks:
+      - nextcloud_network
+    depends_on:
+      - letsencrypt
+      - proxy
+      - db
+    volumes:
+      - ./app/core:/var/www/html
+      - ./app/config:/var/www/html/config
+      - ./app/custom_apps:/var/www/html/custom_apps
+      - ./app/data:/var/www/html/data
+      - ./app/themes:/var/www/html/themes
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - NEXTCLOUD_TRUSTED_DOMAINS=XXX5
+      - VIRTUAL_HOST=XXX6
+      - LETSENCRYPT_HOST=XXX7
+      - LETSENCRYPT_EMAIL=XXX8
+      - NEXTCLOUD_ADMIN_USER=XXX9
+      - NEXTCLOUD_ADMIN_PASSWORD=XXX10
+      - MYSQL_DATABASE=XXX4
+      - MYSQL_USER=XXX2
+      - MYSQL_HOST=db
+      - MYSQL_PASSWORD=XXX3
+      - OVERWRITEPROTOCOL=https # This was necessary in order to linux desktop client to work. Unfortunately it seems to make impossible access nextcloud via ip or localhost in local network. 
+    restart: unless-stopped
+
+
+networks:
+  nextcloud_network:
+
+
+
+## XXX1 Any password. Either way, it is not used by nextcloud configuration
+## XXX2 mySql User
+## XXX3 choose any strong password
+## XXX4 choose any name
+## XXX5 Example: myDomain.duckdns.org 192.168.1.105
+## XXX6 Example: myDomain.duckdns.org, localhost, 192.168.1.105
+## XXX7 Example: myDomain.duckdns.org
+## XXX8 Email for letsEncrypt
+## XXX9 Choose a name for your admin user. Example: admin
+## XX10 Choose a password for your admin user.

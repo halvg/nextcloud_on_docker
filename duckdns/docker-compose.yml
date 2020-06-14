@@ -1,0 +1,17 @@
+version: "2.1"
+services:
+  duckdns:
+    image: linuxserver/duckdns
+    container_name: duckdns
+    environment:
+      - TZ=Europe/Brussels
+      - SUBDOMAINS=XXX1
+      - TOKEN=XXX2
+      - LOG_FILE=false #optional
+    volumes:
+      - ./config:/config #optional
+    restart: unless-stopped
+
+
+# XXX1 Example: myDomain.duckdns.org
+# XXX2 Token given by duckdns in configuration page. Example: ab904619-ab4d-9971-3a3d-9168bcb1bf7d
